@@ -46,14 +46,35 @@ function openDb() {
   });
 }
 
+// A `put` request succeeding is not the same as the write landing. Quota is
+// checked at commit, so QuotaExceededError typically arrives as a transaction
+// abort *after* request.onsuccess has already fired. Resolving on the request
+// would settle the promise first and leave the later onabort rejection to be
+// swallowed -- putAudio would report `{ ok: true }` for a write that never
+// happened, suppressing both the quota banner and the orphaned-blob cleanup.
+// So: writes resolve in transaction.oncomplete, carrying the result captured
+// in request.onsuccess. Reads keep resolving on the request itself -- a
+// readonly transaction has nothing to commit, and the value is wanted as soon
+// as it exists.
 function tx(db, mode, run) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(AUDIO_STORE, mode);
     const request = run(transaction.objectStore(AUDIO_STORE));
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-    if (request) request.onsuccess = () => resolve(request.result);
-    else transaction.oncomplete = () => resolve(undefined);
+    const fail = () => reject(
+      transaction.error ?? new Error('The IndexedDB transaction was aborted.'),
+    );
+    transaction.onerror = fail;
+    transaction.onabort = fail;
+
+    if (mode === 'readwrite') {
+      let result;
+      if (request) request.onsuccess = () => { result = request.result; };
+      transaction.oncomplete = () => resolve(result);
+    } else if (request) {
+      request.onsuccess = () => resolve(request.result);
+    } else {
+      transaction.oncomplete = () => resolve(undefined);
+    }
   });
 }
 
