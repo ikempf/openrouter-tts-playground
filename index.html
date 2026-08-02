@@ -10,6 +10,7 @@
 <header>
   <h1>OpenRouter TTS Playground</h1>
   <div class="key-row">
+    <label for="api-key">API key</label>
     <input id="api-key" type="password" placeholder="sk-or-v1-..." autocomplete="off" spellcheck="false">
     <button id="save-key" type="button">Save key</button>
   </div>
@@ -20,14 +21,20 @@
 <main>
   <section class="config">
     <div class="field">
-      <label>Models <span id="catalog-status" class="hint"></span>
+      <!-- Not a <label>: a button is a labelable element, so labelling this
+           row would make the refresh button its labelled control -- clicking
+           the word "Models" would refetch the catalog, and the button's
+           accessible name would become "Models 19 models refresh". The
+           Voices and Parameters rows follow the same shape for consistency;
+           neither names a control either. -->
+      <div class="field-label">Models <span id="catalog-status" class="hint"></span>
         <button id="refresh-catalog" type="button" class="link">refresh</button>
-      </label>
+      </div>
       <div id="model-list" class="model-list"></div>
     </div>
 
     <div class="field">
-      <label>Voices</label>
+      <div class="field-label">Voices</div>
       <div id="voice-panel" class="voice-panel"></div>
     </div>
 
@@ -37,7 +44,7 @@
     </div>
 
     <div class="field">
-      <label>Parameters</label>
+      <div class="field-label">Parameters</div>
       <div id="params" class="params"></div>
       <label for="response-format" class="inline">Format
         <select id="response-format">
