@@ -130,3 +130,20 @@ test('a thrown fetch becomes a network error rather than an exception', async ()
   assert.equal(result.error.code, 'network');
   assert.match(result.error.message, /Failed to fetch/);
 });
+
+test('blob rejection on an audio response resolves to an error, not a thrown rejection', async () => {
+  const result = await synthesize({
+    apiKey: 'k',
+    body: {},
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'audio/mpeg', 'x-generation-id': 'gen-123' }),
+      blob: async () => {
+        throw new TypeError('Stream aborted');
+      },
+    }),
+  });
+  assert.equal(result.error.code, 'network');
+  assert.match(result.error.message, /Stream aborted/);
+});

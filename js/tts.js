@@ -44,8 +44,15 @@ export async function synthesize({ apiKey, body, fetchImpl = fetch }) {
     };
   }
 
+  let blob;
+  try {
+    blob = await res.blob();
+  } catch (cause) {
+    return { error: { code: 'network', message: cause.message } };
+  }
+
   return {
-    blob: await res.blob(),
+    blob,
     generationId: res.headers.get('x-generation-id'),
   };
 }
