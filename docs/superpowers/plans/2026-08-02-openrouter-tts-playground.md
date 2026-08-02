@@ -39,6 +39,10 @@
 | `js/main.js` | Wiring: form state, fan-out, concurrency, cost preview, banners. |
 | `test/*.test.js` | One file per pure/injectable module. |
 
+**Test command:** `npm test`, which runs bare `node --test`. Node 26 rejects a
+directory argument — `node --test test/` fails with MODULE_NOT_FOUND — while
+bare `node --test` discovers `test/*.test.js` correctly.
+
 ---
 
 ### Task 1: Scaffold and `buildRequest`
@@ -64,7 +68,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "serve": "python3 -m http.server 8080"
   }
 }
@@ -2302,6 +2306,64 @@ git commit -m "docs: add README with run, test and design notes"
 ```
 
 ---
+
+## Hand verification still owed
+
+Everything below needs a real browser and a real API key. Neither was available
+during execution — the machine has no browser, and `libglib-2.0` is absent so
+Playwright's Chromium cannot launch — so **`js/main.js` has never run in a DOM
+and `createIdbAudioStore` has never touched a real IndexedDB.** Task 11's
+17-point checklist above is the core of this; the reviews added these:
+
+- **A `pcm` take.** `synthesize` rejects any success response whose content-type
+  does not start with `audio/`. If OpenRouter answers PCM with
+  `application/octet-stream`, every pcm take fails as `unexpected-type` with no
+  workaround, since the guard is deliberately not overridable. Never live-tested.
+- **IndexedDB commit semantics.** Writes now resolve in `transaction.oncomplete`
+  rather than on request success, so a quota abort is caught rather than
+  swallowed. Fill the quota and confirm the banner appears and no orphaned blob
+  is left behind.
+- **IndexedDB open-failure retry.** Block the first `indexedDB.open()`, confirm
+  the error surfaces, then confirm a later call retries instead of staying wedged.
+- **Clone round-trip through the override box.** Generate a take with
+  `{"provider":{"style":"newscast"}}`, clear the box, clone the take, and confirm
+  the box is restored and the preview matches the original request.
+- **The API-key row.** Its label and flex layout were changed but never rendered.
+
+## Corrections found during execution
+
+The reference code in this plan had five defects, all caught by task review and
+fixed in the shipped implementation. Recorded here so the plan does not mislead
+anyone who reads it later. The shipped code in `js/` is correct; these code
+blocks above are not.
+
+1. **Task 1 — the test command.** `node --test test/` fails with
+   MODULE_NOT_FOUND on Node 26. `package.json` uses bare `node --test`, which
+   discovers `test/*.test.js` correctly.
+2. **Task 4 — `cost.js` fails its own test.** `0.000015 * 500` evaluates to
+   `0.007500000000000001`, not `0.0075`, so `assert.equal(estimateCost(grok,
+   500), 0.0075)` fails against the code as written. Both `estimateCost` and
+   `estimateTotal` round with `Math.round(x * 1e10) / 1e10`.
+3. **Task 6 — `tts.js` could throw.** `await res.blob()` on the success path was
+   unguarded, so a mid-download failure rejected out of `synthesize`, breaking
+   the never-throws contract Task 5's pool depends on. It is wrapped, returning
+   `{ error: { code: 'network' } }`.
+4. **Task 7 — `store.js` wedged on a failed open.** `dbPromise ??= openDb()`
+   caches a *rejected* promise, so one failed `indexedDB.open()` disabled audio
+   storage for the rest of the session with no retry. The cache now clears
+   itself on rejection while still propagating the error.
+5. **Task 10 — the worker read live UI state.** The take record was built from
+   `ui.text.value` / `ui.style.value` / `params` *after* the await, so a retried
+   take, or any take in a batch during which the form was edited, recorded a
+   config that was never sent — defeating the design's central promise that a
+   take carries the exact request that produced it. Those values are captured
+   into each job at click time, and retry reads them from the original take.
+   Separately, concurrent `renderTakes()` calls were serialized through a
+   promise chain; interleaved `replaceChildren()`/append produced duplicate and
+   missing cards.
+
+Test counts in the task steps read one lower than reality from Task 4 onward,
+because correction 2 added a test. The suite finishes at **71**, not 69.
 
 ## Self-Review
 
