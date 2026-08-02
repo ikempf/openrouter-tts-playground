@@ -114,7 +114,9 @@ function refreshPreview() {
     2,
   );
 
-  const cost = estimateTotal(jobs, ui.text.value.length);
+  // Bill against what is actually sent: buildRequest prepends the style to
+  // the text, so counting ui.text alone understates every styled request.
+  const cost = estimateTotal(jobs, composeInput(ui.style.value, ui.text.value).length);
   const plural = jobs.length === 1 ? '' : 's';
   ui.costEstimate.textContent = `${jobs.length} take${plural}, about ${formatCost(cost)}`;
 }
