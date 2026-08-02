@@ -74,10 +74,11 @@ understand and reproduce it.
 {
   id,            // uuid, also the IndexedDB blob key
   model,         // "x-ai/grok-voice-tts-1.0"
-  voice,         // "rex"
+  voice,         // "rex", or null when the provider default was used
   style,         // the style text as typed
   text,          // the script as typed
   params,        // { temperature: 0.7, seed: 42 }
+  rawOverrides,  // the parsed override object, {} when the box was empty
   requestBody,   // the exact body sent, after overrides
   ts,
   favourite,     // boolean
@@ -88,6 +89,16 @@ understand and reproduce it.
 
 `requestBody` is stored verbatim so a take is never ambiguous about what produced
 its audio. This is what the copy-JSON action yields.
+
+The form fields are kept alongside it because `requestBody` cannot be taken
+apart again: style is inseparable from text once prepended, and an overridden
+field is indistinguishable from a generated one. `rawOverrides` in particular
+must be recorded, because overrides always win — cloning a take without them
+would restore a materially different request under the same label. Records
+written before this field existed read as `{}`.
+
+The record is built by `js/take.js` as a pure mapping from `(job, result, id)`,
+so the shape has one origin and is unit-tested.
 
 ## Interface
 

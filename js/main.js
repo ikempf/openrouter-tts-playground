@@ -285,6 +285,14 @@ const handlers = {
     ui.style.value = take.style ?? '';
     ui.text.value = take.text ?? '';
     ui.responseFormat.value = take.requestBody.response_format ?? 'mp3';
+    // Overrides win over everything buildRequest generates, so restoring the
+    // rest of the form without them would clone a materially different
+    // request under the same label. Takes recorded before the field existed
+    // clear the box rather than leaving whatever is in it now.
+    const overrides = take.rawOverrides ?? {};
+    ui.rawOverrides.value = Object.keys(overrides).length
+      ? JSON.stringify(overrides, null, 2)
+      : '';
     renderModels();
     renderVoices();
     renderParams();
@@ -405,10 +413,10 @@ async function generate() {
   }
   // Capture the form once, at click time, and carry it on every prepared
   // job. The worker runs after `await synthesize(...)`, seconds later, by
-  // which point the user may have already edited style/text/params for the
-  // next batch -- reading ui.*.value or the live `params` object from
-  // inside the worker would record what the form says *now*, not what was
-  // actually sent for this job.
+  // which point the user may have already edited style/text/params or the
+  // override box for the next batch -- reading ui.*.value or the live
+  // `params` object from inside the worker would record what the form says
+  // *now*, not what was actually sent for this job.
   const style = ui.style.value;
   const text = ui.text.value;
   const paramsSnapshot = { ...params };
@@ -418,6 +426,7 @@ async function generate() {
     style,
     text,
     params: paramsSnapshot,
+    rawOverrides: overrides.value,
     body: buildRequest({
       model: job.model,
       voice: job.voice,

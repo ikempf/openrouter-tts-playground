@@ -8,6 +8,7 @@ const job = {
   style: '(gravelly)',
   text: 'The old lighthouse.',
   params: { temperature: 0.7 },
+  rawOverrides: { provider: { style: 'newscast', styledegree: 1.4 } },
   body: {
     model: 'x-ai/grok-voice-tts-1.0',
     input: '(gravelly)\n\nThe old lighthouse.',
@@ -26,6 +27,7 @@ test('builds an ok take from a successful result', () => {
     style: '(gravelly)',
     text: 'The old lighthouse.',
     params: { temperature: 0.7 },
+    rawOverrides: { provider: { style: 'newscast', styledegree: 1.4 } },
     requestBody: job.body,
     ts: 1000,
     favourite: false,
@@ -49,6 +51,7 @@ test('a retry records the resent take rather than the job wrapper', () => {
     style: 'as first sent',
     text: 'original script',
     params: { temperature: 0.2 },
+    rawOverrides: { provider: { style: 'as first sent' } },
   };
   const retryJob = {
     modelId: 'x-ai/grok-voice-tts-1.0',
@@ -57,12 +60,27 @@ test('a retry records the resent take rather than the job wrapper', () => {
     style: 'edited since',
     text: 'edited since',
     params: { temperature: 9 },
+    rawOverrides: { provider: { style: 'edited since' } },
     take: original,
   };
   const take = createTake({ job: retryJob, result: { blob: {} }, id: 'take-3', ts: 3000 });
   assert.equal(take.style, 'as first sent');
   assert.equal(take.text, 'original script');
   assert.deepEqual(take.params, { temperature: 0.2 });
+  assert.deepEqual(take.rawOverrides, { provider: { style: 'as first sent' } });
+});
+
+test('records the overrides, so a take made with them can be reproduced', () => {
+  const take = createTake({ job, result: { blob: {} }, id: 'take-5', ts: 5000 });
+  assert.deepEqual(take.rawOverrides, { provider: { style: 'newscast', styledegree: 1.4 } });
+  // What is recorded must survive the localStorage round trip a clone reads back.
+  assert.deepEqual(JSON.parse(JSON.stringify(take)).rawOverrides, take.rawOverrides);
+});
+
+test('a job with no overrides records an empty object, never undefined', () => {
+  const { rawOverrides, ...withoutOverrides } = job;
+  const take = createTake({ job: withoutOverrides, result: { blob: {} }, id: 'i', ts: 1 });
+  assert.deepEqual(take.rawOverrides, {});
 });
 
 test('an absent voice is recorded as null, not undefined', () => {
@@ -91,6 +109,13 @@ test('tolerates a job with no params', () => {
     ts: 1,
   });
   assert.deepEqual(take.params, {});
+});
+
+test('copies the overrides too', () => {
+  const rawOverrides = { provider: { style: 'newscast' } };
+  const take = createTake({ job: { ...job, rawOverrides }, result: { blob: {} }, id: 'i', ts: 1 });
+  delete rawOverrides.provider;
+  assert.deepEqual(take.rawOverrides, { provider: { style: 'newscast' } });
 });
 
 test('reads no live UI state: it runs at all in an environment with no DOM', () => {
