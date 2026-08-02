@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenRouter TTS Playground</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+  <h1>OpenRouter TTS Playground</h1>
+  <div class="key-row">
+    <input id="api-key" type="password" placeholder="sk-or-v1-..." autocomplete="off" spellcheck="false">
+    <button id="save-key" type="button">Save key</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main>
+  <section class="config">
+    <div class="field">
+      <label>Models <span id="catalog-status" class="hint"></span>
+        <button id="refresh-catalog" type="button" class="link">refresh</button>
+      </label>
+      <div id="model-list" class="model-list"></div>
+    </div>
+
+    <div class="field">
+      <label>Voices</label>
+      <div id="voice-panel" class="voice-panel"></div>
+    </div>
+
+    <div class="field">
+      <label for="style">Style <span class="hint">prepended to the text</span></label>
+      <input id="style" type="text" placeholder="(gravelly, unhurried)">
+    </div>
+
+    <div class="field">
+      <label>Parameters</label>
+      <div id="params" class="params"></div>
+      <label for="response-format" class="inline">Format
+        <select id="response-format">
+          <option value="mp3">mp3</option>
+          <option value="pcm">pcm</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="text">Text</label>
+      <textarea id="text" rows="5" placeholder="The old lighthouse had not been lit in forty years."></textarea>
+    </div>
+
+    <details>
+      <summary>Raw request overrides (JSON, merged last)</summary>
+      <textarea id="raw-overrides" rows="4" spellcheck="false"
+        placeholder='{ "provider": { "style": "newscast", "styledegree": 1.4 } }'></textarea>
+    </details>
+
+    <details>
+      <summary>Request preview</summary>
+      <pre id="request-preview"></pre>
+    </details>
+
+    <div class="actions">
+      <button id="generate" type="button">Generate</button>
+      <span id="cost-estimate" class="hint"></span>
+    </div>
+  </section>
+
+  <section class="takes">
+    <h2>Takes <span id="take-count" class="hint"></span></h2>
+    <div id="takes"></div>
+    <p class="hint">
+      <span id="storage-usage"></span>
+      <button id="clear-audio" type="button" class="link">clear stored audio</button>
+    </p>
+  </section>
+</main>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
