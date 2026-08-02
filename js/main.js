@@ -224,10 +224,24 @@ async function renderTakes() {
   ui.takeCount.textContent = `${takes.length} take${takes.length === 1 ? '' : 's'}`;
   ui.takes.replaceChildren();
 
+  // store.getAudio/audioUsage are backed by IndexedDB and, unlike the rest of
+  // this app's storage calls, can reject (a broken/blocked database). This
+  // function runs inside the runPool worker (via runJobs), whose contract is
+  // "never throw" — an uncaught rejection here would abort unrelated
+  // in-flight synthesis jobs. Degrade to the take card's existing no-audio
+  // state instead, and surface one banner for the whole refresh rather than
+  // one per affected take.
+  let audioStoreFailed = false;
+
   for (const take of takes) {
     let url = audioUrls.get(take.id);
     if (!url && take.status === 'ok') {
-      const blob = await store.getAudio(take.id);
+      let blob = null;
+      try {
+        blob = await store.getAudio(take.id);
+      } catch {
+        audioStoreFailed = true;
+      }
       if (blob) {
         url = URL.createObjectURL(blob);
         audioUrls.set(take.id, url);
@@ -236,7 +250,17 @@ async function renderTakes() {
     ui.takes.append(renderTake(take, { audioUrl: url, handlers }));
   }
 
-  ui.storageUsage.textContent = `stored audio ${formatBytes(await store.audioUsage())} · `;
+  let usage = 0;
+  try {
+    usage = await store.audioUsage();
+  } catch {
+    audioStoreFailed = true;
+  }
+  ui.storageUsage.textContent = `stored audio ${formatBytes(usage)} · `;
+
+  if (audioStoreFailed) {
+    showBanner("Could not read this browser's stored audio. Affected takes show without a player.");
+  }
 }
 
 const handlers = {
