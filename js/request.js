@@ -25,6 +25,29 @@ export function deepMerge(base, override) {
   return out;
 }
 
+/** The raw JSON override box, validated. Returns `{ value }` on success and
+ *  `{ error }` on failure -- never both, never neither. Only a JSON *object*
+ *  is accepted: the value is deep-merged into the request body, which arrays
+ *  and scalars cannot be. */
+export function parseOverrides(raw) {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return { value: {} };
+  try {
+    const value = JSON.parse(trimmed);
+    if (!isPlainObject(value)) return { error: 'Overrides must be a JSON object.' };
+    return { value };
+  } catch (cause) {
+    return { error: `Overrides are not valid JSON: ${cause.message}` };
+  }
+}
+
+/** The exact `input` string buildRequest will send, so callers that need its
+ *  length (the cost estimate) count what is actually sent, style included. */
+export function composeInput(style, text) {
+  const trimmedStyle = (style ?? '').trim();
+  return trimmedStyle ? `${trimmedStyle}\n\n${text}` : text;
+}
+
 export function buildRequest({
   model,
   voice,
@@ -34,10 +57,9 @@ export function buildRequest({
   responseFormat = 'mp3',
   rawOverrides = {},
 }) {
-  const trimmedStyle = (style ?? '').trim();
   const body = {
     model: model.id,
-    input: trimmedStyle ? `${trimmedStyle}\n\n${text}` : text,
+    input: composeInput(style, text),
   };
 
   if (voice) body.voice = voice;

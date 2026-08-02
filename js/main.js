@@ -1,4 +1,5 @@
-import { buildRequest, expandJobs } from './request.js';
+import { buildRequest, composeInput, expandJobs, parseOverrides } from './request.js';
+import { createTake } from './take.js';
 import { loadCatalog } from './models.js';
 import { estimateTotal, formatCost } from './cost.js';
 import { runPool } from './pool.js';
@@ -63,19 +64,7 @@ function clearBanner() {
 
 const selectedModels = () => catalog.filter((m) => selectedModelIds.includes(m.id));
 
-function parseOverrides() {
-  const raw = ui.rawOverrides.value.trim();
-  if (!raw) return { value: {} };
-  try {
-    const value = JSON.parse(raw);
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return { error: 'Overrides must be a JSON object.' };
-    }
-    return { value };
-  } catch (cause) {
-    return { error: `Overrides are not valid JSON: ${cause.message}` };
-  }
-}
+const currentOverrides = () => parseOverrides(ui.rawOverrides.value);
 
 function currentJobs() {
   return expandJobs({ models: selectedModels(), voicesByModel });
@@ -95,7 +84,7 @@ function saveForm() {
 
 function refreshPreview() {
   const jobs = currentJobs();
-  const overrides = parseOverrides();
+  const overrides = currentOverrides();
 
   ui.generate.disabled = jobs.length === 0 || Boolean(overrides.error);
 
@@ -338,25 +327,7 @@ async function runJobs(prepared) {
     await runPool(prepared, CONCURRENCY, async (job) => {
       const result = await synthesize({ apiKey, body: job.body });
       const id = crypto.randomUUID();
-      // job.take is present only for a retry (see onRetry below) and is the
-      // take that was actually resent -- its style/text/params are what was
-      // in effect when that take was first recorded, not the form's current
-      // state. Fall back to the job itself, which carries the same three
-      // fields captured at click time by generate().
-      const source = job.take ?? job;
-      const take = {
-        id,
-        model: job.modelId,
-        voice: job.voice,
-        style: source.style,
-        text: source.text,
-        params: { ...source.params },
-        requestBody: job.body,
-        ts: Date.now(),
-        favourite: false,
-        status: result.error ? 'error' : 'ok',
-        error: result.error ?? null,
-      };
+      const take = createTake({ job, result, id });
 
       let blobPersisted = false;
       if (result.blob) {
@@ -427,7 +398,7 @@ function reportError(error) {
 
 async function generate() {
   clearBanner();
-  const overrides = parseOverrides();
+  const overrides = currentOverrides();
   if (overrides.error) {
     showBanner(overrides.error);
     return;

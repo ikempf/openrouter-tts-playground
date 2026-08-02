@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRequest, deepMerge, PARAM_WHITELIST, expandJobs, normalizeVoiceSelection } from '../js/request.js';
+import {
+  buildRequest,
+  composeInput,
+  deepMerge,
+  PARAM_WHITELIST,
+  expandJobs,
+  normalizeVoiceSelection,
+  parseOverrides,
+} from '../js/request.js';
 
 const grok = {
   id: 'x-ai/grok-voice-tts-1.0',
@@ -184,4 +192,50 @@ test('normalizeVoiceSelection trims and drops blanks', () => {
   assert.deepEqual(normalizeVoiceSelection(' a , ,b '), ['a', 'b']);
   assert.deepEqual(normalizeVoiceSelection(['a', '', ' b ']), ['a', 'b']);
   assert.deepEqual(normalizeVoiceSelection(undefined), []);
+});
+
+test('parseOverrides accepts a JSON object', () => {
+  const parsed = parseOverrides('{ "provider": { "style": "newscast" } }');
+  assert.deepEqual(parsed, { value: { provider: { style: 'newscast' } } });
+  assert.equal('error' in parsed, false);
+});
+
+test('parseOverrides treats an empty or blank box as no overrides', () => {
+  for (const raw of ['', '   ', '\n', undefined, null]) {
+    assert.deepEqual(parseOverrides(raw), { value: {} });
+  }
+});
+
+test('parseOverrides reports malformed JSON without throwing', () => {
+  const parsed = parseOverrides('{ "provider": ');
+  assert.equal('value' in parsed, false);
+  assert.match(parsed.error, /^Overrides are not valid JSON: /);
+});
+
+test('parseOverrides rejects a JSON array', () => {
+  assert.deepEqual(parseOverrides('[1, 2]'), { error: 'Overrides must be a JSON object.' });
+});
+
+test('parseOverrides rejects JSON scalars, including null', () => {
+  for (const raw of ['42', '"newscast"', 'true', 'null']) {
+    assert.deepEqual(parseOverrides(raw), { error: 'Overrides must be a JSON object.' });
+  }
+});
+
+test('parseOverrides returns exactly one of value or error', () => {
+  for (const raw of ['{}', '{"a":1}', '', 'nope', '[]', '3']) {
+    const parsed = parseOverrides(raw);
+    assert.equal(Object.keys(parsed).length, 1);
+    assert.equal('value' in parsed !== 'error' in parsed, true);
+  }
+});
+
+test('composeInput is the input buildRequest sends', () => {
+  assert.equal(composeInput('(gravelly)', 'Hi.'), '(gravelly)\n\nHi.');
+  assert.equal(composeInput('  ', 'Hi.'), 'Hi.');
+  assert.equal(composeInput(undefined, 'Hi.'), 'Hi.');
+  assert.equal(
+    composeInput('(gravelly)', 'Hi.'),
+    buildRequest({ model: grok, text: 'Hi.', style: '(gravelly)' }).input,
+  );
 });
