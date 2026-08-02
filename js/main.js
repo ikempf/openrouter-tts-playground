@@ -319,6 +319,7 @@ async function runJobs(prepared) {
   }
 
   ui.generate.disabled = true;
+  let saveFailed = false;
   try {
     await runPool(prepared, CONCURRENCY, async (job) => {
       const result = await synthesize({ apiKey, body: job.body });
@@ -336,15 +337,54 @@ async function runJobs(prepared) {
         status: result.error ? 'error' : 'ok',
         error: result.error ?? null,
       };
-      store.addTake(take);
+
+      let blobPersisted = false;
       if (result.blob) {
         const stored = await store.putAudio(id, result.blob);
         if (!stored.ok) showBanner(stored.message);
-        audioUrls.set(id, URL.createObjectURL(result.blob));
+        blobPersisted = stored.ok;
       }
-      if (result.error) reportError(result.error);
+
+      // store.addTake writes the whole take list back to localStorage and,
+      // unlike putAudio, can throw synchronously (e.g. QuotaExceededError)
+      // when storage is full. An uncaught throw here would escape this
+      // async worker and abort unrelated in-flight jobs via runPool's
+      // Promise.all -- guard it the same way putAudio's own contract
+      // already guards IndexedDB failures.
+      let recordSaved = true;
+      try {
+        store.addTake(take);
+      } catch {
+        recordSaved = false;
+        saveFailed = true;
+      }
+
+      if (recordSaved) {
+        if (result.blob) audioUrls.set(id, URL.createObjectURL(result.blob));
+        if (result.error) reportError(result.error);
+      } else if (blobPersisted) {
+        // No take record exists to reach this blob, so leaving it in
+        // IndexedDB would orphan it: quota spent on audio no take card can
+        // ever reach or delete. store.removeTake is safe to call even
+        // though the record was never added -- it filters the (unaffected)
+        // take list and unconditionally removes any audio stored under
+        // this id. It is itself another localStorage write (plus an
+        // IndexedDB delete), so it inherits the very failure mode this
+        // block exists to guard against -- best-effort only, and must not
+        // throw either: the storage-full banner below already tells the
+        // user what happened.
+        try {
+          await store.removeTake(id);
+        } catch {
+          // Cleanup failed too; nothing further to do here.
+        }
+      }
+
       await renderTakes();
     });
+    if (saveFailed) {
+      showBanner('Could not save the take — browser storage is full. Delete some takes or clear stored audio.');
+    }
   } finally {
     refreshPreview();
   }
