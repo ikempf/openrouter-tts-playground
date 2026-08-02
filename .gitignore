@@ -1,0 +1,7 @@
+*.mp3
+*.wav
+*.pcm
+.env
+.DS_Store
+node_modules/
+scratch/
