@@ -56,6 +56,13 @@ main {
 label, .field-label { display: block; margin-bottom: .35rem; font-weight: 500; }
 label.inline { display: inline-block; margin-top: .5rem; }
 
+/* Label, cycle button and phrase name on one line above the textarea. The
+   label keeps its own margin off so the row spaces as a unit. */
+.text-head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .35rem; }
+.text-head label { margin-bottom: 0; }
+.text-head button { font-size: 1.05em; line-height: 1; text-decoration: none; }
+.text-head .hint { margin-left: auto; }
+
 input, textarea, select, button {
   font: inherit;
   color: var(--fg);

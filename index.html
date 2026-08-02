@@ -55,7 +55,15 @@
     </div>
 
     <div class="field">
-      <label for="text">Text</label>
+      <!-- The button is a sibling of the label, never a child: <button> is a
+           labelable element, so nesting it would make clicking the word "Text"
+           fire the cycle. -->
+      <div class="text-head">
+        <label for="text">Text</label>
+        <button id="phrase-cycle" type="button" class="link"
+          title="Load the next sample phrase" aria-label="Load the next sample phrase">↻</button>
+        <span id="phrase-name" class="hint"></span>
+      </div>
       <textarea id="text" rows="5" placeholder="The old lighthouse had not been lit in forty years."></textarea>
     </div>
 

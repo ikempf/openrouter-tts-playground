@@ -1,4 +1,5 @@
 import { buildRequest, composeInput, expandJobs, parseOverrides } from './request.js';
+import { PHRASES, nextPhrase } from './phrases.js';
 import { createTake } from './take.js';
 import { loadCatalog } from './models.js';
 import { estimateTotal, formatCost } from './cost.js';
@@ -23,6 +24,8 @@ const ui = {
   responseFormat: el('response-format'),
   style: el('style'),
   text: el('text'),
+  phraseCycle: el('phrase-cycle'),
+  phraseName: el('phrase-name'),
   rawOverrides: el('raw-overrides'),
   requestPreview: el('request-preview'),
   costEstimate: el('cost-estimate'),
@@ -37,6 +40,7 @@ let catalog = [];
 let selectedModelIds = [];
 let voicesByModel = {};
 let params = {};
+let phraseIndex = null;
 const audioUrls = new Map();
 
 // renderTakes() does `ui.takes.replaceChildren()` and then appends inside a
@@ -79,6 +83,7 @@ function saveForm() {
     text: ui.text.value,
     responseFormat: ui.responseFormat.value,
     rawOverrides: ui.rawOverrides.value,
+    phraseIndex,
   });
 }
 
@@ -474,8 +479,29 @@ function restoreForm() {
   ui.text.value = form.text ?? '';
   ui.responseFormat.value = form.responseFormat ?? 'mp3';
   ui.rawOverrides.value = form.rawOverrides ?? '';
+  // The label is derived, not stored: the library can change between
+  // sessions, so a persisted name could outlive the phrase it named.
+  phraseIndex = Number.isInteger(form.phraseIndex) && PHRASES[form.phraseIndex]
+    ? form.phraseIndex
+    : null;
+  ui.phraseName.textContent = phraseIndex === null ? '' : phraseLabel(phraseIndex);
   ui.apiKey.value = store.getApiKey();
 }
+
+function phraseLabel(index) {
+  return `${PHRASES[index].name} · ${index + 1}/${PHRASES.length}`;
+}
+
+function loadNextPhrase() {
+  const phrase = nextPhrase(phraseIndex);
+  phraseIndex = phrase.index;
+  ui.text.value = phrase.text;
+  ui.phraseName.textContent = phraseLabel(phrase.index);
+  saveForm();
+  refreshPreview();
+}
+
+ui.phraseCycle.addEventListener('click', loadNextPhrase);
 
 ui.saveKey.addEventListener('click', () => {
   store.setApiKey(ui.apiKey.value.trim());

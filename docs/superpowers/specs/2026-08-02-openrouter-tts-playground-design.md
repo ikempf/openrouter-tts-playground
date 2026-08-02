@@ -146,6 +146,25 @@ selections:
 - Selecting a model but no voice for it produces one job for that model with
   `voice` omitted, letting the provider default apply.
 
+### Sample phrases
+
+A `↻` button beside the Text label loads the next entry from a small library
+of sample scripts, wrapping at the end, with the phrase's name and position
+shown alongside. The library exists so voices can be auditioned across a
+spread of deliveries — calm narration, menace, warmth, high energy, a diction
+stress-test of numbers and acronyms, restraint, brightness, and a question /
+exclamation ladder for intonation — rather than judged on one register.
+
+Clicking overwrites whatever is in the textarea, including typing in progress.
+A guard that declined to overwrite edited text would silently do nothing and
+read as a broken button.
+
+The current index persists with the rest of the form state; the displayed name
+is derived from it rather than stored, so a persisted label can never outlive
+the phrase it named. The button is a **sibling** of the `<label for="text">`,
+never a child — `<button>` is a labelable element, so nesting it would make
+clicking the word "Text" fire the cycle.
+
 Two collapsible panels sit under the form:
 
 - **Raw request overrides (JSON)** — merged into the body last, always winning.
@@ -180,12 +199,14 @@ audio-playground/
     take.js       PURE: build the take record
     cost.js       PURE: estimate fan-out cost from model pricing
     pool.js       PURE: bounded-concurrency job runner
+    phrases.js    PURE: the sample phrase library and its cycling
     tts.js        POST, distinguish audio from error
     store.js      localStorage + IndexedDB
     takes.js      render take cards
   test/
     request.test.js
     take.test.js
+    phrases.test.js
     cost.test.js
     pool.test.js
     models.test.js
@@ -201,6 +222,7 @@ audio-playground/
 | `take.js` | `createTake({job, result, id}) → take`. Pure; reads no live UI state | — |
 | `cost.js` | `estimateTotal(jobs, charCount) → usd`, `formatCost(usd) → string`. Pure | — |
 | `pool.js` | `runPool(items, limit, worker)`, bounded concurrency, worker never throws | — |
+| `phrases.js` | `PHRASES`, `nextPhrase(index) → { index, name, text }`. Pure; wraps and tolerates a stale index | — |
 | `tts.js` | `synthesize(key, body) → {blob} \| {error}`; `fetch` injected | — |
 | `store.js` | key/form/takes in localStorage, blobs in IndexedDB, quota handling; both stores injected | — |
 | `takes.js` | `renderTake(take) → element` plus its actions, and the pure label/time/byte formatters | — |
@@ -284,6 +306,9 @@ Unit tests under `node --test`, no browser:
   JSON reports rather than throws, arrays and scalars are rejected.
 - `expandJobs` — voices pair only with their owning model, comma-separated
   free-text voices expand, a model with no voice selected yields one job.
+- `phrases.js` — the library is non-empty with unique names, cycling advances
+  and wraps, a stale or non-integer index falls back to the first phrase, and
+  the returned object cannot mutate the library.
 - `take.js` — the ok and error shapes, a retry sources the resent take, the
   record copies what it is given and reads no live state.
 - `models.js` — `supported_voices: null` becomes free-text mode, whitelist
