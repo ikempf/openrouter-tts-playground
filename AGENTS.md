@@ -22,9 +22,25 @@ localStorage is scoped per origin, so always use the same port.
 npm test        # node --test, which discovers test/*.test.js
 ```
 
-Only pure logic is unit-tested: request building, catalog normalization, cost
-estimation. DOM wiring and IndexedDB are verified by hand. A live smoke test
-against the real API costs money and is run manually, never in a test sweep.
+Everything testable without a browser is unit-tested: request building and
+override parsing (`request.js`), take-record construction (`take.js`), catalog
+normalization (`models.js`), cost estimation, the job pool, the storage layer
+against an injected `localStorage` and in-memory audio store, `tts.js` against
+an injected `fetch`, and `takes.js`'s pure formatters.
+
+What is **not** covered, and what that means:
+
+- `js/main.js` has no tests and has never run in a browser. It is DOM wiring
+  only — anything in it worth testing should move to a module that is.
+- `createIdbAudioStore` has never touched a real IndexedDB. `store.js` is tested
+  through `createMemoryAudioStore`, which is a stand-in, not the thing.
+
+So: **DOM wiring, IndexedDB persistence across a reload, and the quota-exceeded
+path must be verified by hand, and have not been yet.** Do not read this section
+as a record that they work.
+
+A live smoke test against the real API costs money and is run manually, never in
+a test sweep.
 
 ## Constraints
 

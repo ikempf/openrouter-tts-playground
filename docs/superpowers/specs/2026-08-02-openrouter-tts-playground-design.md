@@ -176,22 +176,34 @@ audio-playground/
   js/
     main.js       form state, fan-out, concurrency, wiring
     models.js     fetch + cache catalog, normalize voices, filter params
-    request.js    PURE: build request body
+    request.js    PURE: build request body, parse overrides, expand jobs
+    take.js       PURE: build the take record
+    cost.js       PURE: estimate fan-out cost from model pricing
+    pool.js       PURE: bounded-concurrency job runner
     tts.js        POST, distinguish audio from error
     store.js      localStorage + IndexedDB
     takes.js      render take cards
   test/
     request.test.js
+    take.test.js
+    cost.test.js
+    pool.test.js
     models.test.js
+    store.test.js
+    tts.test.js
+    takes.test.js
 ```
 
 | module | contract | depends on |
 |---|---|---|
-| `models.js` | `loadCatalog() → Model[]`; null voices become free-text mode; params intersected with the TTS whitelist | — |
-| `request.js` | `buildRequest(config) → body` and `expandJobs(selection) → job[]`. No fetch, no DOM, no storage | — |
-| `tts.js` | `synthesize(key, body) → {blob} \| {error}` | request.js |
-| `store.js` | key/form/takes in localStorage, blobs in IndexedDB, quota handling | — |
-| `takes.js` | `renderTake(take) → element` plus its actions | store.js |
+| `models.js` | `loadCatalog() → Model[]`; null voices become free-text mode; params intersected with the TTS whitelist | `request.js` (the whitelist) |
+| `request.js` | `buildRequest(config) → body`, `expandJobs(selection) → job[]`, `parseOverrides(text) → {value}\|{error}`, `composeInput(style, text) → string`. No fetch, no DOM, no storage | — |
+| `take.js` | `createTake({job, result, id}) → take`. Pure; reads no live UI state | — |
+| `cost.js` | `estimateTotal(jobs, charCount) → usd`, `formatCost(usd) → string`. Pure | — |
+| `pool.js` | `runPool(items, limit, worker)`, bounded concurrency, worker never throws | — |
+| `tts.js` | `synthesize(key, body) → {blob} \| {error}`; `fetch` injected | — |
+| `store.js` | key/form/takes in localStorage, blobs in IndexedDB, quota handling; both stores injected | — |
+| `takes.js` | `renderTake(take) → element` plus its actions, and the pure label/time/byte formatters | — |
 | `main.js` | orchestration | all |
 
 `request.js` holds the only logic worth testing, so it stays pure:
@@ -268,14 +280,24 @@ Unit tests under `node --test`, no browser:
 
 - `request.js` — style prepending, parameter filtering drops `logprobs`, override
   precedence, absent style leaves text untouched.
+- `parseOverrides` — an object parses, an empty box means no overrides, malformed
+  JSON reports rather than throws, arrays and scalars are rejected.
 - `expandJobs` — voices pair only with their owning model, comma-separated
   free-text voices expand, a model with no voice selected yields one job.
+- `take.js` — the ok and error shapes, a retry sources the resent take, the
+  record copies what it is given and reads no live state.
 - `models.js` — `supported_voices: null` becomes free-text mode, whitelist
   intersection.
-- Cost estimation.
+- Cost estimation, the job pool, `store.js` against an injected `localStorage`
+  and an in-memory audio store, `tts.js` against an injected `fetch`, and
+  `takes.js`'s formatters.
 
-Verified by hand: DOM wiring, IndexedDB persistence across reload, the
-quota-exceeded path.
+**Not yet verified — and these must be checked by hand before the tool is
+trusted:** DOM wiring, IndexedDB persistence across a reload, and the
+quota-exceeded path. `js/main.js` has never run in a browser and
+`createIdbAudioStore` has never touched a real IndexedDB; `store.js` is tested
+through an in-memory stand-in, which is not the same thing. Nothing in this
+document should be read as a record that these work.
 
 One live smoke test against the real API, run manually. It costs money and is
 never part of an automated sweep.
