@@ -38,6 +38,20 @@ let voicesByModel = {};
 let params = {};
 const audioUrls = new Map();
 
+// renderTakes() does `ui.takes.replaceChildren()` and then appends inside a
+// loop containing `await store.getAudio(...)`. With CONCURRENCY = 3, up to
+// three workers can each call renderTakes() around the same time; without
+// serialization, one call's replaceChildren() can land in the middle of
+// another's append loop, producing duplicate or missing take cards. Queue
+// every call onto a single chain so renders still happen one per completed
+// job (takes still appear as they finish) but never interleave.
+let renderChain = Promise.resolve();
+function scheduleRenderTakes() {
+  const run = () => renderTakes();
+  renderChain = renderChain.then(run, run);
+  return renderChain;
+}
+
 function showBanner(message) {
   ui.banner.textContent = message;
   ui.banner.hidden = false;
@@ -294,7 +308,7 @@ const handlers = {
   },
   onFavourite(take) {
     store.updateTake(take.id, { favourite: !take.favourite });
-    renderTakes();
+    scheduleRenderTakes();
   },
   async onRetry(take) {
     await runJobs([{ modelId: take.model, voice: take.voice, body: take.requestBody, take }]);
@@ -306,7 +320,7 @@ const handlers = {
       audioUrls.delete(take.id);
     }
     await store.removeTake(take.id);
-    renderTakes();
+    scheduleRenderTakes();
   },
 };
 
@@ -324,13 +338,19 @@ async function runJobs(prepared) {
     await runPool(prepared, CONCURRENCY, async (job) => {
       const result = await synthesize({ apiKey, body: job.body });
       const id = crypto.randomUUID();
+      // job.take is present only for a retry (see onRetry below) and is the
+      // take that was actually resent -- its style/text/params are what was
+      // in effect when that take was first recorded, not the form's current
+      // state. Fall back to the job itself, which carries the same three
+      // fields captured at click time by generate().
+      const source = job.take ?? job;
       const take = {
         id,
         model: job.modelId,
         voice: job.voice,
-        style: ui.style.value,
-        text: ui.text.value,
-        params: { ...params },
+        style: source.style,
+        text: source.text,
+        params: { ...source.params },
         requestBody: job.body,
         ts: Date.now(),
         favourite: false,
@@ -380,7 +400,7 @@ async function runJobs(prepared) {
         }
       }
 
-      await renderTakes();
+      await scheduleRenderTakes();
     });
     if (saveFailed) {
       showBanner('Could not save the take — browser storage is full. Delete some takes or clear stored audio.');
@@ -412,14 +432,26 @@ async function generate() {
     showBanner(overrides.error);
     return;
   }
+  // Capture the form once, at click time, and carry it on every prepared
+  // job. The worker runs after `await synthesize(...)`, seconds later, by
+  // which point the user may have already edited style/text/params for the
+  // next batch -- reading ui.*.value or the live `params` object from
+  // inside the worker would record what the form says *now*, not what was
+  // actually sent for this job.
+  const style = ui.style.value;
+  const text = ui.text.value;
+  const paramsSnapshot = { ...params };
   const prepared = currentJobs().map((job) => ({
     modelId: job.model.id,
     voice: job.voice,
+    style,
+    text,
+    params: paramsSnapshot,
     body: buildRequest({
       model: job.model,
       voice: job.voice,
-      text: ui.text.value,
-      style: ui.style.value,
+      text,
+      style,
       params,
       responseFormat: ui.responseFormat.value,
       rawOverrides: overrides.value,
@@ -481,9 +513,9 @@ ui.clearAudio.addEventListener('click', async () => {
   await store.clearAudio();
   for (const url of audioUrls.values()) URL.revokeObjectURL(url);
   audioUrls.clear();
-  await renderTakes();
+  await scheduleRenderTakes();
 });
 
 restoreForm();
 await refreshCatalog();
-await renderTakes();
+await scheduleRenderTakes();
