@@ -9,7 +9,9 @@ export function estimateCost(model, charCount) {
 }
 
 export function estimateTotal(jobs, charCount) {
-  return jobs.reduce((sum, job) => sum + estimateCost(job.model, charCount), 0);
+  const sum = jobs.reduce((total, job) => total + estimateCost(job.model, charCount), 0);
+  // Round to 10 decimal places to avoid floating-point precision issues in the accumulated total
+  return Math.round(sum * 1e10) / 1e10;
 }
 
 export function formatCost(usd) {
