@@ -1,0 +1,26 @@
+[tools]
+# Node runs the test suite via its built-in runner — there are no npm
+# dependencies. Pinned to 26 because `node --test test/` fails there with
+# MODULE_NOT_FOUND; the tasks below use bare `node --test`, which works on
+# both 22 and 26, and the pin keeps that from drifting back.
+node = "26"
+
+# Only for the static server. The page itself is plain ES modules with no
+# build step, so nothing here compiles or bundles anything.
+python = "3.14"
+
+[tasks.test]
+description = "Run the unit tests"
+run = "node --test"
+
+[tasks.serve]
+description = "Serve the playground at http://localhost:8080"
+run = "python3 -m http.server 8080"
+
+[tasks.check]
+description = "Syntax-check every module without executing it"
+# One file per invocation on purpose: `node --check a.js b.js` silently
+# ignores everything after the first argument and exits 0, so the obvious
+# one-liner would pass while checking almost nothing. Worth having because
+# `npm test` imports every module except main.js, which nothing imports.
+run = 'for f in js/*.js; do node --check "$f" || exit 1; done'

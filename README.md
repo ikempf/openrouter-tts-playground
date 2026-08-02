@@ -7,7 +7,7 @@ result carries the exact request that produced it, copyable as JSON.
 ## Run
 
 ```sh
-python3 -m http.server 8080
+mise run serve      # or: python3 -m http.server 8080
 ```
 
 Then open <http://localhost:8080> and paste an OpenRouter API key.
@@ -18,11 +18,17 @@ localStorage is scoped per origin, so use the same port each time.
 ## Test
 
 ```sh
-npm test
+mise run test       # or: npm test
+mise run check      # syntax-check every module, including the untested main.js
 ```
 
 No dependencies, no build step. `package.json` exists only for ES module
 resolution and the test script.
+
+`mise.toml` pins the two tools this needs: Node to run the tests, and Python
+only to serve the files. Node is pinned to 26 because `node --test test/` fails
+there with MODULE_NOT_FOUND — the tasks use bare `node --test`, which works on
+22 and 26 alike.
 
 ## How it works
 

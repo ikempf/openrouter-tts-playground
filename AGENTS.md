@@ -10,8 +10,11 @@ not just an audio file.
 ## Running it
 
 ```sh
-python3 -m http.server 8080     # then open http://localhost:8080
+mise run serve                  # or: python3 -m http.server 8080
 ```
+
+Then open <http://localhost:8080>. `mise.toml` pins Node (tests) and Python
+(static server only) — those are the project's sole external tools.
 
 An http origin is required — ES modules do not load over `file://`, and
 localStorage is scoped per origin, so always use the same port.
