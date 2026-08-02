@@ -1,0 +1,111 @@
+const KEYS = {
+  apiKey: 'or_tts.api_key',
+  form: 'or_tts.form',
+  takes: 'or_tts.takes',
+  catalog: 'or_tts.catalog',
+};
+
+const DB_NAME = 'or-tts-playground';
+const DB_VERSION = 1;
+const AUDIO_STORE = 'audio';
+
+function readJson(storage, key, fallback) {
+  const raw = storage.getItem(key);
+  if (raw === null) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+export function createMemoryAudioStore() {
+  const blobs = new Map();
+  return {
+    async put(id, blob) { blobs.set(id, blob); },
+    async get(id) { return blobs.get(id); },
+    async remove(id) { blobs.delete(id); },
+    async clear() { blobs.clear(); },
+    async usage() {
+      let total = 0;
+      for (const blob of blobs.values()) total += blob.size;
+      return total;
+    },
+  };
+}
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function tx(db, mode, run) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(AUDIO_STORE, mode);
+    const request = run(transaction.objectStore(AUDIO_STORE));
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+    if (request) request.onsuccess = () => resolve(request.result);
+    else transaction.oncomplete = () => resolve(undefined);
+  });
+}
+
+export function createIdbAudioStore() {
+  let dbPromise = null;
+  const db = () => (dbPromise ??= openDb());
+  return {
+    async put(id, blob) { await tx(await db(), 'readwrite', (s) => s.put(blob, id)); },
+    async get(id) { return tx(await db(), 'readonly', (s) => s.get(id)); },
+    async remove(id) { await tx(await db(), 'readwrite', (s) => s.delete(id)); },
+    async clear() { await tx(await db(), 'readwrite', (s) => s.clear()); },
+    async usage() {
+      const blobs = await tx(await db(), 'readonly', (s) => s.getAll());
+      return (blobs ?? []).reduce((total, blob) => total + (blob?.size ?? 0), 0);
+    },
+  };
+}
+
+export function createStore({ storage = localStorage, audio = createIdbAudioStore() } = {}) {
+  const writeTakes = (takes) => storage.setItem(KEYS.takes, JSON.stringify(takes));
+  const readTakes = () => readJson(storage, KEYS.takes, []);
+
+  return {
+    getApiKey: () => storage.getItem(KEYS.apiKey) ?? '',
+    setApiKey: (key) => storage.setItem(KEYS.apiKey, key),
+
+    getForm: () => readJson(storage, KEYS.form, {}),
+    setForm: (form) => storage.setItem(KEYS.form, JSON.stringify(form)),
+
+    getCatalog: () => readJson(storage, KEYS.catalog, null),
+    setCatalog: (models) => storage.setItem(KEYS.catalog, JSON.stringify(models)),
+
+    listTakes: () => [...readTakes()].sort((a, b) => b.ts - a.ts),
+    addTake(take) { writeTakes([...readTakes(), take]); },
+    updateTake(id, patch) {
+      writeTakes(readTakes().map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    },
+    async removeTake(id) {
+      writeTakes(readTakes().filter((t) => t.id !== id));
+      await audio.remove(id);
+    },
+
+    async putAudio(id, blob) {
+      try {
+        await audio.put(id, blob);
+        return { ok: true };
+      } catch (cause) {
+        return { ok: false, message: `Could not store audio: ${cause.message}` };
+      }
+    },
+    getAudio: (id) => audio.get(id),
+    clearAudio: () => audio.clear(),
+    audioUsage: () => audio.usage(),
+  };
+}
