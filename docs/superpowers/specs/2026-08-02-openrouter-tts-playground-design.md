@@ -165,6 +165,27 @@ the phrase it named. The button is a **sibling** of the `<label for="text">`,
 never a child — `<button>` is a labelable element, so nesting it would make
 clicking the word "Text" fire the cycle.
 
+### Direction presets
+
+A `⚙` button sets style, `temperature`, `top_p` and text together, cycling
+through six directions — Documentary, Villain, Bedtime, Commentary, Announcer,
+Confidant. It sits a level above the phrase cycler: `⚙` picks a delivery, `↻`
+then varies the script underneath it, which is how you tell a voice's range
+from one lucky line.
+
+A preset **names** its phrase rather than indexing it, so reordering the
+phrase library cannot silently repoint a preset at the wrong script. The
+resolved phrase index moves into the text cycler, so `↻` continues from the
+preset's script instead of restarting. An unresolvable name leaves the
+textarea untouched rather than blanking it.
+
+The parameters are always written to form state, but the parameter row only
+renders inputs for the `tunables` of the selected models, and `buildRequest`
+drops what a model does not support. On a model reporting no tunables at all
+— `fish-audio/s1`, for one — `⚙` visibly changes style and text while
+`temperature` and `top_p` appear inert. That is the existing behaviour of
+every parameter, and the request preview shows what is actually sent.
+
 Two collapsible panels sit under the form:
 
 - **Raw request overrides (JSON)** — merged into the body last, always winning.
@@ -200,6 +221,7 @@ audio-playground/
     cost.js       PURE: estimate fan-out cost from model pricing
     pool.js       PURE: bounded-concurrency job runner
     phrases.js    PURE: the sample phrase library and its cycling
+    presets.js    PURE: direction presets and their phrase resolution
     tts.js        POST, distinguish audio from error
     store.js      localStorage + IndexedDB
     takes.js      render take cards
@@ -207,6 +229,7 @@ audio-playground/
     request.test.js
     take.test.js
     phrases.test.js
+    presets.test.js
     cost.test.js
     pool.test.js
     models.test.js
@@ -223,6 +246,7 @@ audio-playground/
 | `cost.js` | `estimateTotal(jobs, charCount) → usd`, `formatCost(usd) → string`. Pure | — |
 | `pool.js` | `runPool(items, limit, worker)`, bounded concurrency, worker never throws | — |
 | `phrases.js` | `PHRASES`, `nextPhrase(index) → { index, name, text }`. Pure; wraps and tolerates a stale index | — |
+| `presets.js` | `PRESETS`, `nextPreset(index)`, `resolvePhrase(name)`. Pure; a preset names its phrase rather than indexing it | `phrases.js` |
 | `tts.js` | `synthesize(key, body) → {blob} \| {error}`; `fetch` injected | — |
 | `store.js` | key/form/takes in localStorage, blobs in IndexedDB, quota handling; both stores injected | — |
 | `takes.js` | `renderTake(take) → element` plus its actions, and the pure label/time/byte formatters | — |
@@ -306,6 +330,10 @@ Unit tests under `node --test`, no browser:
   JSON reports rather than throws, arrays and scalars are rejected.
 - `expandJobs` — voices pair only with their owning model, comma-separated
   free-text voices expand, a model with no voice selected yields one job.
+- `presets.js` — every preset's phrase name resolves in `PHRASES` (the drift
+  guard), parameters sit inside the ranges the API accepts, cycling advances
+  and wraps, an unknown phrase name degrades rather than inventing text, and
+  the returned object cannot mutate the library.
 - `phrases.js` — the library is non-empty with unique names, cycling advances
   and wraps, a stale or non-integer index falls back to the first phrase, and
   the returned object cannot mutate the library.

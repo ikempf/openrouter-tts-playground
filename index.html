@@ -39,6 +39,18 @@
     </div>
 
     <div class="field">
+      <!-- Same rule as the phrase button: a sibling of the label, never a
+           child, because <button> is a labelable element. -->
+      <div class="text-head">
+        <div class="field-label">Preset</div>
+        <button id="preset-cycle" type="button" class="link"
+          title="Load the next direction preset" aria-label="Load the next direction preset">⚙</button>
+        <span id="preset-name" class="hint"></span>
+      </div>
+      <p class="hint preset-note">Sets style, temperature, top_p and text together.</p>
+    </div>
+
+    <div class="field">
       <label for="style">Style <span class="hint">prepended to the text</span></label>
       <input id="style" type="text" placeholder="(gravelly, unhurried)">
     </div>

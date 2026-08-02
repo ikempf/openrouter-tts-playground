@@ -28,7 +28,8 @@ npm test        # node --test, which discovers test/*.test.js
 Everything testable without a browser is unit-tested: request building and
 override parsing (`request.js`), take-record construction (`take.js`), catalog
 normalization (`models.js`), cost estimation, the job pool, the sample phrase
-library and its cycling (`phrases.js`), the storage layer against an injected
+library and its cycling (`phrases.js`), the direction presets and the phrase
+reference each one carries (`presets.js`), the storage layer against an injected
 `localStorage` and in-memory audio store, `tts.js` against an injected `fetch`,
 and `takes.js`'s pure formatters.
 

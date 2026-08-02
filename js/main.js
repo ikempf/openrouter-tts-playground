@@ -1,5 +1,6 @@
 import { buildRequest, composeInput, expandJobs, parseOverrides } from './request.js';
 import { PHRASES, nextPhrase } from './phrases.js';
+import { PRESETS, nextPreset } from './presets.js';
 import { createTake } from './take.js';
 import { loadCatalog } from './models.js';
 import { estimateTotal, formatCost } from './cost.js';
@@ -24,6 +25,8 @@ const ui = {
   responseFormat: el('response-format'),
   style: el('style'),
   text: el('text'),
+  presetCycle: el('preset-cycle'),
+  presetName: el('preset-name'),
   phraseCycle: el('phrase-cycle'),
   phraseName: el('phrase-name'),
   rawOverrides: el('raw-overrides'),
@@ -41,6 +44,7 @@ let selectedModelIds = [];
 let voicesByModel = {};
 let params = {};
 let phraseIndex = null;
+let presetIndex = null;
 const audioUrls = new Map();
 
 // renderTakes() does `ui.takes.replaceChildren()` and then appends inside a
@@ -84,6 +88,7 @@ function saveForm() {
     responseFormat: ui.responseFormat.value,
     rawOverrides: ui.rawOverrides.value,
     phraseIndex,
+    presetIndex,
   });
 }
 
@@ -485,7 +490,34 @@ function restoreForm() {
     ? form.phraseIndex
     : null;
   ui.phraseName.textContent = phraseIndex === null ? '' : phraseLabel(phraseIndex);
+  presetIndex = Number.isInteger(form.presetIndex) && PRESETS[form.presetIndex]
+    ? form.presetIndex
+    : null;
+  ui.presetName.textContent = presetIndex === null ? '' : presetLabel(presetIndex);
   ui.apiKey.value = store.getApiKey();
+}
+
+function presetLabel(index) {
+  return `${PRESETS[index].name} · ${index + 1}/${PRESETS.length}`;
+}
+
+/** Sets style, both params, and the text in one step. The phrase index moves
+ *  with it so the text cycler resumes from the preset's script rather than
+ *  restarting — that is what lets you hold a direction and vary the script. */
+function loadNextPreset() {
+  const preset = nextPreset(presetIndex);
+  presetIndex = preset.index;
+  ui.style.value = preset.style;
+  Object.assign(params, preset.params);
+  if (preset.phraseIndex !== null) {
+    phraseIndex = preset.phraseIndex;
+    ui.text.value = preset.text;
+    ui.phraseName.textContent = phraseLabel(phraseIndex);
+  }
+  ui.presetName.textContent = presetLabel(preset.index);
+  renderParams();
+  saveForm();
+  refreshPreview();
 }
 
 function phraseLabel(index) {
@@ -502,6 +534,7 @@ function loadNextPhrase() {
 }
 
 ui.phraseCycle.addEventListener('click', loadNextPhrase);
+ui.presetCycle.addEventListener('click', loadNextPreset);
 
 ui.saveKey.addEventListener('click', () => {
   store.setApiKey(ui.apiKey.value.trim());

@@ -62,6 +62,8 @@ label.inline { display: inline-block; margin-top: .5rem; }
 .text-head label { margin-bottom: 0; }
 .text-head button { font-size: 1.05em; line-height: 1; text-decoration: none; }
 .text-head .hint { margin-left: auto; }
+.text-head .field-label { margin-bottom: 0; }
+.preset-note { margin: 0; }
 
 input, textarea, select, button {
   font: inherit;
