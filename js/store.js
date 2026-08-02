@@ -59,7 +59,15 @@ function tx(db, mode, run) {
 
 export function createIdbAudioStore() {
   let dbPromise = null;
-  const db = () => (dbPromise ??= openDb());
+  const db = () => {
+    if (!dbPromise) {
+      dbPromise = openDb().catch(error => {
+        dbPromise = null; // Clear on failure to allow retry
+        throw error; // Re-throw so caller still sees the error
+      });
+    }
+    return dbPromise;
+  };
   return {
     async put(id, blob) { await tx(await db(), 'readwrite', (s) => s.put(blob, id)); },
     async get(id) { return tx(await db(), 'readonly', (s) => s.get(id)); },
