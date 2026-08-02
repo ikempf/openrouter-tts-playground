@@ -2307,6 +2307,29 @@ git commit -m "docs: add README with run, test and design notes"
 
 ---
 
+## Hand verification still owed
+
+Everything below needs a real browser and a real API key. Neither was available
+during execution — the machine has no browser, and `libglib-2.0` is absent so
+Playwright's Chromium cannot launch — so **`js/main.js` has never run in a DOM
+and `createIdbAudioStore` has never touched a real IndexedDB.** Task 11's
+17-point checklist above is the core of this; the reviews added these:
+
+- **A `pcm` take.** `synthesize` rejects any success response whose content-type
+  does not start with `audio/`. If OpenRouter answers PCM with
+  `application/octet-stream`, every pcm take fails as `unexpected-type` with no
+  workaround, since the guard is deliberately not overridable. Never live-tested.
+- **IndexedDB commit semantics.** Writes now resolve in `transaction.oncomplete`
+  rather than on request success, so a quota abort is caught rather than
+  swallowed. Fill the quota and confirm the banner appears and no orphaned blob
+  is left behind.
+- **IndexedDB open-failure retry.** Block the first `indexedDB.open()`, confirm
+  the error surfaces, then confirm a later call retries instead of staying wedged.
+- **Clone round-trip through the override box.** Generate a take with
+  `{"provider":{"style":"newscast"}}`, clear the box, clone the take, and confirm
+  the box is restored and the preview matches the original request.
+- **The API-key row.** Its label and flex layout were changed but never rendered.
+
 ## Corrections found during execution
 
 The reference code in this plan had five defects, all caught by task review and
