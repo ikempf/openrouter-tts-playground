@@ -39,6 +39,10 @@
 | `js/main.js` | Wiring: form state, fan-out, concurrency, cost preview, banners. |
 | `test/*.test.js` | One file per pure/injectable module. |
 
+**Test command:** `npm test`, which runs bare `node --test`. Node 26 rejects a
+directory argument — `node --test test/` fails with MODULE_NOT_FOUND — while
+bare `node --test` discovers `test/*.test.js` correctly.
+
 ---
 
 ### Task 1: Scaffold and `buildRequest`
@@ -64,7 +68,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "serve": "python3 -m http.server 8080"
   }
 }

@@ -19,7 +19,7 @@ localStorage is scoped per origin, so always use the same port.
 ## Testing
 
 ```sh
-node --test test/
+npm test        # node --test, which discovers test/*.test.js
 ```
 
 Only pure logic is unit-tested: request building, catalog normalization, cost
