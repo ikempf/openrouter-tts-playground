@@ -53,3 +53,27 @@ export function buildRequest({
 
   return deepMerge(body, rawOverrides);
 }
+
+export function normalizeVoiceSelection(raw) {
+  const parts = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  return parts.map((v) => String(v).trim()).filter(Boolean);
+}
+
+/** Voices belong to models, so this is not a blind cross product:
+ *  a job exists only where a voice was chosen for that specific model. */
+export function expandJobs({ models, voicesByModel = {} }) {
+  const jobs = [];
+  for (const model of models) {
+    const voices = normalizeVoiceSelection(voicesByModel[model.id]);
+    if (voices.length === 0) {
+      jobs.push({ model, voice: null });
+      continue;
+    }
+    for (const voice of voices) jobs.push({ model, voice });
+  }
+  return jobs;
+}
